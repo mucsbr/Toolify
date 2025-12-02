@@ -4,3 +4,4 @@ httpx
 pydantic
 pyyaml
 uvicorn
+tiktoken
