@@ -198,6 +198,15 @@ try:
         )
     logger.info(f"🔄 Default service: {DEFAULT_SERVICE['name']}")
 
+    # Preload common encodings to avoid blocking on first request
+    logger.info("🔧 Preloading token encoders...")
+    try:
+        for encoding_name in ["cl100k_base", "o200k_base"]:
+            tiktoken.get_encoding(encoding_name)
+        logger.info("✅ Token encoders preloaded successfully")
+    except Exception as enc_error:
+        logger.warning(f"⚠️  Failed to preload encoders: {enc_error}. Will load on demand.")
+
 except Exception as e:
     logger.error(f"❌ Configuration loading failed: {type(e).__name__}")
     logger.error(f"❌ Error details: {str(e)}")
