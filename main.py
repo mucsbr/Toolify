@@ -1472,13 +1472,14 @@ async def chat_completions(
                 body.model,
                 has_function_call,
                 GLOBAL_TRIGGER_SIGNAL,
+                prompt_tokens,
             ),
             media_type="text/event-stream",
         )
 
 
 async def stream_proxy_with_fc_transform(
-    url: str, body: dict, headers: dict, model: str, has_fc: bool, trigger_signal: str
+    url: str, body: dict, headers: dict, model: str, has_fc: bool, trigger_signal: str, prompt_tokens: int
 ):
     """
     Enhanced streaming proxy, supports dynamic trigger signals, avoids misjudgment within think tags
@@ -1723,6 +1724,21 @@ async def stream_proxy_with_fc_transform(
         }
         yield f"data: {json.dumps(final_yield_chunk)}\n\n"
 
+    # Add usage chunk before [DONE]
+    completion_tokens = token_counter.count_text_tokens(detector.content_buffer, model)
+    usage_chunk = {
+        "id": f"chatcmpl-usage-{uuid.uuid4().hex}",
+        "object": "chat.completion.chunk",
+        "created": int(os.path.getmtime(__file__)),
+        "model": model,
+        "choices": [],
+        "usage": {
+            "prompt_tokens": prompt_tokens,
+            "completion_tokens": completion_tokens,
+            "total_tokens": prompt_tokens + completion_tokens
+        }
+    }
+    yield f"data: {json.dumps(usage_chunk)}\n\n"
     yield "data: [DONE]\n\n"
 
 
