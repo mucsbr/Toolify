@@ -1160,7 +1160,7 @@ def preprocess_messages(messages: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
 
                 if tool_call_id:
                     # Handle empty content - use placeholder if content is empty/None
-                    actual_content = content if content else "(Tool executed successfully with no output)"
+                    actual_content = content if content else "No content"
                     formatted_content = format_tool_result_for_ai(tool_call_id, actual_content)
                     processed_message = {"role": "user", "content": formatted_content}
                     processed_messages.append(processed_message)
