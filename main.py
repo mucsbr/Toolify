@@ -1657,12 +1657,15 @@ async def stream_proxy_with_fc_transform(
 
                     try:
                         chunk_json = json.loads(line_data)
+                        choices = chunk_json.get("choices", [{}])
                         delta_content = (
-                            chunk_json.get("choices", [{}])[0]
-                            .get("delta", {})
-                            .get("content", "")
-                            or ""
-                        )
+                            choices[0].get("delta", {}).get("content", "")
+                            if choices else ""
+                        ) or ""
+
+                        # Check if this is a finish chunk (has finish_reason but no content)
+                        # We need to forward these chunks to preserve finish_reason info
+                        finish_reason = choices[0].get("finish_reason") if choices else None
 
                         if delta_content:
                             is_detected, content_to_yield = detector.process_chunk(
@@ -1687,6 +1690,22 @@ async def stream_proxy_with_fc_transform(
                             if is_detected:
                                 # Tool call signal detected, switch to parsing mode
                                 continue
+
+                        elif finish_reason:
+                            # This is a finish chunk without content - forward it to preserve
+                            # finish_reason and any other metadata (like usage for multi-choice)
+                            # Rebuild the chunk with model name override
+                            finish_chunk = {
+                                "id": chunk_json.get("id", f"chatcmpl-{uuid.uuid4().hex}"),
+                                "object": "chat.completion.chunk",
+                                "created": chunk_json.get("created", int(os.path.getmtime(__file__))),
+                                "model": model,
+                                "choices": choices,
+                            }
+                            # Include usage if present in the original chunk
+                            if "usage" in chunk_json:
+                                finish_chunk["usage"] = chunk_json["usage"]
+                            yield f"data: {json.dumps(finish_chunk)}\n\n"
 
                     except (json.JSONDecodeError, IndexError):
                         yield line + "\n\n"
