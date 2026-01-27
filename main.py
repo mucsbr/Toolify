@@ -1158,16 +1158,18 @@ def preprocess_messages(messages: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
                 tool_call_id = message.get("tool_call_id")
                 content = message.get("content")
 
-                if tool_call_id and content:
-                    formatted_content = format_tool_result_for_ai(tool_call_id, content)
+                if tool_call_id:
+                    # Handle empty content - use placeholder if content is empty/None
+                    actual_content = content if content else "(Tool executed successfully with no output)"
+                    formatted_content = format_tool_result_for_ai(tool_call_id, actual_content)
                     processed_message = {"role": "user", "content": formatted_content}
                     processed_messages.append(processed_message)
                     logger.debug(
-                        f"🔧 Converted tool message to user message: tool_call_id={tool_call_id}"
+                        f"🔧 Converted tool message to user message: tool_call_id={tool_call_id}, has_content={bool(content)}"
                     )
                 else:
                     logger.debug(
-                        f"🔧 Skipped invalid tool message: tool_call_id={tool_call_id}, content={bool(content)}"
+                        f"🔧 Skipped invalid tool message: missing tool_call_id"
                     )
             elif (
                 message.get("role") == "assistant"
