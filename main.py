@@ -1535,7 +1535,7 @@ async def stream_proxy_with_fc_transform(
         return tool_calls
 
     def _build_tool_call_sse_chunks(
-        parsed_tools: List[Dict[str, Any]], model_id: str
+        parsed_tools: List[Dict[str, Any]], model_id: str, prompt_tokens: int = 0
     ) -> List[str]:
         tool_calls = _prepare_tool_calls(parsed_tools)
         chunks: List[str] = []
@@ -1567,6 +1567,28 @@ async def stream_proxy_with_fc_transform(
             "choices": [{"index": 0, "delta": {}, "finish_reason": "tool_calls"}],
         }
         chunks.append(f"data: {json.dumps(final_chunk)}\n\n")
+
+        # Add usage chunk for tool_calls responses
+        # Estimate completion tokens from tool call arguments
+        completion_tokens = sum(
+            token_counter.count_text_tokens(
+                json.dumps(tool.get("function", {}).get("arguments", "")), model_id
+            )
+            for tool in tool_calls
+        )
+        usage_chunk = {
+            "id": f"chatcmpl-usage-{uuid.uuid4().hex}",
+            "object": "chat.completion.chunk",
+            "created": int(os.path.getmtime(__file__)),
+            "model": model_id,
+            "choices": [],
+            "usage": {
+                "prompt_tokens": prompt_tokens,
+                "completion_tokens": completion_tokens,
+                "total_tokens": prompt_tokens + completion_tokens
+            }
+        }
+        chunks.append(f"data: {json.dumps(usage_chunk)}\n\n")
         chunks.append("data: [DONE]\n\n")
         return chunks
 
@@ -1626,7 +1648,7 @@ async def stream_proxy_with_fc_transform(
                                             f"🔧 Early finalize: parsed {len(parsed_tools)} tool calls"
                                         )
                                         for sse in _build_tool_call_sse_chunks(
-                                            parsed_tools, model
+                                            parsed_tools, model, prompt_tokens
                                         ):
                                             yield sse
                                         return
@@ -1725,7 +1747,7 @@ async def stream_proxy_with_fc_transform(
             logger.debug(
                 f"🔧 Streaming processing: Successfully parsed {len(parsed_tools)} tool calls"
             )
-            for sse in _build_tool_call_sse_chunks(parsed_tools, model):
+            for sse in _build_tool_call_sse_chunks(parsed_tools, model, prompt_tokens):
                 yield sse
             return
         else:
