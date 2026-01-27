@@ -936,13 +936,11 @@ def parse_function_calls_xml(
                 ptext = ""
             ptext = ptext.strip()
 
-            # try to coerce JSON-like values, otherwise keep string
-            try:
-                coerced = json.loads(ptext)
-            except Exception:
-                coerced = ptext
+            # Keep parameter values as strings - do NOT parse JSON content
+            # OpenAI tool_calls format expects arguments to be a JSON string,
+            # so we should preserve the original string value
             if pname:
-                args[pname] = coerced
+                args[pname] = ptext
             else:
                 # If parameter tag has no name attribute, generate numeric key
                 args_key = f"param_{len(args) + 1}"
@@ -990,12 +988,10 @@ def parse_function_calls_xml(
             pname = m.group(1) or m.group(3)
             pval = m.group(2) or m.group(4) or ""
             pval = pval.strip()
-            try:
-                coerced = json.loads(pval)
-            except Exception:
-                coerced = pval
+            # Keep parameter values as strings - do NOT parse JSON content
+            # OpenAI tool_calls format expects arguments to be a JSON string
             if pname:
-                args[pname] = coerced
+                args[pname] = pval
 
         if not invoke_name:
             logger.debug("🔧 Regex fallback: no invoke name found")
