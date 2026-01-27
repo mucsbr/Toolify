@@ -936,15 +936,25 @@ def parse_function_calls_xml(
                 ptext = ""
             ptext = ptext.strip()
 
-            # Keep parameter values as strings - do NOT parse JSON content
-            # OpenAI tool_calls format expects arguments to be a JSON string,
-            # so we should preserve the original string value
+            # Parse primitive JSON values (boolean, number, null) but keep complex types as strings
+            # This ensures correct types for tool parameters while avoiding nested object issues
+            try:
+                parsed = json.loads(ptext)
+                # Only use parsed value for primitives (bool, int, float, None)
+                # Keep strings and complex types (dict, list) as-is to avoid nested object issues
+                if isinstance(parsed, (bool, int, float)) or parsed is None:
+                    value = parsed
+                else:
+                    value = ptext
+            except (json.JSONDecodeError, ValueError):
+                value = ptext
+
             if pname:
-                args[pname] = ptext
+                args[pname] = value
             else:
                 # If parameter tag has no name attribute, generate numeric key
                 args_key = f"param_{len(args) + 1}"
-                args[args_key] = coerced
+                args[args_key] = value
 
         if not invoke_name:
             logger.debug("🔧 <invoke> block parsed but no name attribute found")
@@ -988,10 +998,19 @@ def parse_function_calls_xml(
             pname = m.group(1) or m.group(3)
             pval = m.group(2) or m.group(4) or ""
             pval = pval.strip()
-            # Keep parameter values as strings - do NOT parse JSON content
-            # OpenAI tool_calls format expects arguments to be a JSON string
+
+            # Parse primitive JSON values (boolean, number, null) but keep complex types as strings
+            try:
+                parsed = json.loads(pval)
+                if isinstance(parsed, (bool, int, float)) or parsed is None:
+                    value = parsed
+                else:
+                    value = pval
+            except (json.JSONDecodeError, ValueError):
+                value = pval
+
             if pname:
-                args[pname] = pval
+                args[pname] = value
 
         if not invoke_name:
             logger.debug("🔧 Regex fallback: no invoke name found")
