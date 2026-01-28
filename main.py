@@ -938,8 +938,16 @@ def parse_function_calls_xml(
 
             # Parse primitive JSON values (boolean, number, null) but keep complex types as strings
             # This ensures correct types for tool parameters while avoiding nested object issues
+            # Handle Python-style booleans (True/False) that LLMs might output
+            if ptext in ("True", "False", "None"):
+                ptext_normalized = ptext.lower()
+                if ptext_normalized == "none":
+                    ptext_normalized = "null"
+            else:
+                ptext_normalized = ptext
+
             try:
-                parsed = json.loads(ptext)
+                parsed = json.loads(ptext_normalized)
                 # Only use parsed value for primitives (bool, int, float, None)
                 # Keep strings and complex types (dict, list) as-is to avoid nested object issues
                 if isinstance(parsed, (bool, int, float)) or parsed is None:
